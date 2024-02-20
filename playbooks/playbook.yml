@@ -1,0 +1,90 @@
+- name: LAMP Host Playbook
+  hosts: localhost
+  tasks:
+    - name: Install Firewalld
+      yum: 
+        name: firewalld
+        state: present
+
+    - name: Install MariaDB Database
+      yum: 
+        name: mariadb-server
+        state: present
+
+    - name: Start Firewalld service
+      service:
+          name: firewalld
+          state: started
+
+    - name: Start MariaDB service
+      service:
+          name: mariadb
+          state: started
+
+  tasks:
+    - name: Configure Firewall rules to database
+      command: firewall-cmd --permanent --zone=public --add-port=3306/tcp
+      become: yes
+      become_user: root
+
+    - name: Reload Firewall 
+      command: firewall-cmd --reload
+      become: yes
+      become_user: root
+    
+    - name: Configure Database
+      script: /home/e-com-project/playbooks/roles/lamp-app/db-config.sh
+
+    - name: Copy DB load script to home
+      copy: 
+        src: /home/e-com-project/playbooks/roles/lamp-app/db-load-script.sql
+        dest: /home/
+
+    - name: Create tables in Database
+      command: mysql < db-load-script.sql
+      become: yes
+      become_user: root
+  
+  tasks:
+    - name: Install dependencies
+      yum:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+        - httpd
+        - php
+        - php-mysqlnd
+
+     loop: "{{ packages }}"
+
+    - name: Configure Firewall rules to Apache
+      command: firewall-cmd --permanent --zone=public --add-port=80/tcp
+      become: yes
+      become_user: root
+
+    - name: Reload Firewall 
+      command: firewall-cmd --reload
+      become: yes
+      become_user: root
+
+    - name: Configure Apache
+      command: sed -i 's/index.html/index.php/g' /etc/httpd/conf/httpd.conf
+      become: yes
+      become_user: root
+
+  tasks:
+    - name: Start Apache
+      service:
+        name: httpd
+        state: started
+
+    - name: Upload Web page code to html dir
+      copy:
+        src: /home/e-com-project/playbooks/roles/lamp-app/index.html
+        dest: /var/www/html/
+
+
+
+
+  
